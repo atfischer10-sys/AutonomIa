@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AutonomIA - AI Fiscal Copilot</title>
+    <script>
+      // Early fix for "Uncaught TypeError: Cannot set property fetch of #<Window> which has only a getter"
+      // This happens when libraries try to polyfill fetch in environments where it's read-only.
+      (function() {
+        try {
+          var originalFetch = window.fetch;
+          if (originalFetch) {
+            // Try to redefine it on window itself
+            Object.defineProperty(window, 'fetch', {
+              get: function() { return originalFetch; },
+              set: function(v) { console.warn('Ignored fetch overwrite on window'); },
+              configurable: true,
+              enumerable: true
+            });
+          }
+        } catch (e) {
+          // If we can't make it writable on window, try the prototype
+          try {
+            var proto = Object.getPrototypeOf(window);
+            if (proto && proto.fetch) {
+              Object.defineProperty(proto, 'fetch', {
+                get: function() { return originalFetch; },
+                set: function(v) { console.warn('Ignored fetch overwrite on prototype'); },
+                configurable: true,
+                enumerable: true
+              });
+            }
+          } catch (e2) {
+            console.warn('Could not make fetch writable in index.html:', e2);
+          }
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
