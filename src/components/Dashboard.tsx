@@ -4,7 +4,7 @@ import { TrendingUp, TrendingDown, Wallet, Calculator, AlertCircle, ArrowUpRight
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, calculateFiscalSummary2026 } from '../lib/utils';
 import { InvoiceForm } from './InvoiceForm';
-import { Invoice, Expense } from '../types';
+import { Invoice, Expense, AppNotification } from '../types';
 import { supabase } from '../lib/supabase';
 
 const StatCard = ({ title, value, subValue, icon: Icon, trend, color }: any) => (
@@ -35,9 +35,17 @@ interface DashboardProps {
   invoices: Invoice[];
   setInvoices: React.Dispatch<React.SetStateAction<Invoice[]>>;
   expenses: Expense[];
+  notifications: AppNotification[];
+  setNotifications: React.Dispatch<React.SetStateAction<AppNotification[]>>;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ invoices, setInvoices, expenses }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ 
+  invoices, 
+  setInvoices, 
+  expenses,
+  notifications,
+  setNotifications
+}) => {
   const [showForm, setShowForm] = useState(false);
   const summary = calculateFiscalSummary2026(invoices, expenses);
 
@@ -118,7 +126,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ invoices, setInvoices, exp
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 font-serif">Hola, Anthony 👋</h1>
-          <p className="text-slate-500">Tu piloto automático fiscal está al día. No hay alertas críticas.</p>
+          <p className="text-slate-500">Tu piloto automático fiscal está al día. {notifications.filter(n => !n.isRead && n.priority === 'high').length > 0 ? `Tienes ${notifications.filter(n => !n.isRead && n.priority === 'high').length} alertas pendientes.` : 'No hay alertas críticas.'}</p>
         </div>
         <div className="flex items-center gap-3">
           <button className="bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-medium hover:bg-slate-50 transition-colors flex items-center gap-2">
@@ -134,6 +142,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ invoices, setInvoices, exp
           </button>
         </div>
       </div>
+
+      {/* Notifications/Alerts Section */}
+      <AnimatePresence>
+        {notifications.filter(n => !n.isRead && n.priority === 'high').length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="space-y-3 overflow-hidden"
+          >
+            {notifications.filter(n => !n.isRead && n.priority === 'high').map(notif => (
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                key={notif.id}
+                className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-center justify-between gap-4 shadow-sm"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="bg-amber-100 p-2 rounded-xl text-amber-600">
+                    <AlertCircle size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">{notif.title}</h4>
+                    <p className="text-xs text-slate-600">{notif.description}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n))}
+                  className="text-xs font-bold text-amber-600 hover:underline px-3 py-1.5 bg-white rounded-lg border border-amber-100 shrink-0"
+                >
+                  Entendido
+                </button>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

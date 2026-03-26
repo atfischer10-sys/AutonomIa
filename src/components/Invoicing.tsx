@@ -6,7 +6,11 @@ import { InvoiceForm } from './InvoiceForm';
 import { Invoice } from '../types';
 import { supabase } from '../lib/supabase';
 
-export const Invoicing: React.FC<{ invoices: Invoice[]; setInvoices: React.Dispatch<React.SetStateAction<Invoice[]>> }> = ({ invoices, setInvoices }) => {
+export const Invoicing: React.FC<{ 
+  invoices: Invoice[]; 
+  setInvoices: React.Dispatch<React.SetStateAction<Invoice[]>>;
+  setIsAssistantOpen: (isOpen: boolean) => void;
+}> = ({ invoices, setInvoices, setIsAssistantOpen }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -95,7 +99,10 @@ export const Invoicing: React.FC<{ invoices: Invoice[]; setInvoices: React.Dispa
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-medium hover:bg-slate-50 transition-colors flex items-center gap-2">
+          <button 
+            onClick={() => setIsAssistantOpen(true)}
+            className="bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-medium hover:bg-slate-50 transition-colors flex items-center gap-2"
+          >
             <Sparkles size={18} className="text-brand-primary" />
             Generar con IA
           </button>
@@ -221,7 +228,10 @@ export const Invoicing: React.FC<{ invoices: Invoice[]; setInvoices: React.Dispa
             Solo dime: "Crea una factura para [Cliente] de [Importe] por [Concepto]".
           </p>
         </div>
-        <button className="bg-white text-brand-primary border border-brand-primary/20 px-6 py-3 rounded-xl font-bold hover:bg-white/50 transition-all shadow-sm">
+        <button 
+          onClick={() => setIsAssistantOpen(true)}
+          className="bg-white text-brand-primary border border-brand-primary/20 px-6 py-3 rounded-xl font-bold hover:bg-white/50 transition-all shadow-sm"
+        >
           Probar ahora
         </button>
       </div>

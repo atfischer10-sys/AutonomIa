@@ -7,20 +7,54 @@ import { Deductions } from './components/Deductions';
 import { TaxesView } from './components/TaxesView';
 import { FiscalCalendar } from './components/FiscalCalendar';
 import { Onboarding } from './components/Onboarding';
-import { Copilot } from './components/Copilot';
+import { VirtualAssistant } from './components/Copilot';
 import { Profile } from './components/Profile';
 import { Banking } from './components/Banking';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, Loader2, X } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
-import { Invoice, Expense, BankAccount, BankTransaction } from './types';
+import { Invoice, Expense, BankAccount, BankTransaction, AppNotification } from './types';
 import { GoogleGenAI } from "@google/genai";
 
 export default function App() {
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  const [isConnectingBank, setIsConnectingBank] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([
+    {
+      id: '1',
+      title: 'Vencimiento IVA Trimestral',
+      description: 'El plazo para presentar el Modelo 303 termina en 5 días.',
+      date: '2026-04-20',
+      type: 'tax',
+      isRead: false,
+      priority: 'high',
+      link: 'taxes'
+    },
+    {
+      id: '2',
+      title: 'Factura Pendiente',
+      description: 'La factura INV-2026-003 de Cliente XYZ está vencida.',
+      date: '2026-03-25',
+      type: 'payment',
+      isRead: false,
+      priority: 'medium',
+      link: 'invoices'
+    },
+    {
+      id: '3',
+      title: 'Nueva Deducción Sugerida',
+      description: 'La IA ha detectado un gasto que podría ser deducible.',
+      date: '2026-03-26',
+      type: 'system',
+      isRead: true,
+      priority: 'low',
+      link: 'deductions'
+    }
+  ]);
   const [accounts, setAccounts] = useState<BankAccount[]>([
     {
       id: 'acc-1',
@@ -141,6 +175,13 @@ export default function App() {
 
     checkUser();
 
+    // Check for Open Banking callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const requisitionId = urlParams.get('ref');
+    if (requisitionId) {
+      handleBankCallback(requisitionId);
+    }
+
     // Listen for success message from popup
     const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'SUPABASE_AUTH_SUCCESS') {
@@ -230,18 +271,78 @@ export default function App() {
     setShowOnboarding(false);
   };
 
-  const handleConnectBank = () => {
-    const newAccount: BankAccount = {
-      id: `acc-${Date.now()}`,
-      name: 'Nueva Cuenta',
-      bankName: 'Banco Santander',
-      balance: 5000.00,
-      currency: 'EUR',
-      lastSync: 'Ahora',
-      accountNumber: 'ES45 **** 1234',
-      status: 'active'
-    };
-    setAccounts([...accounts, newAccount]);
+  const handleBankCallback = async (requisitionId: string) => {
+    setLoading(true);
+    try {
+      // 1. Get accounts
+      const accountsRes = await fetch(`/api/banks/accounts/${requisitionId}`);
+      const accountsData = await accountsRes.json();
+      
+      if (accountsData.error) throw new Error(accountsData.error);
+
+      const newAccounts: BankAccount[] = accountsData.map((acc: any) => ({
+        id: acc.id,
+        name: acc.details.account.name || 'Cuenta Bancaria',
+        bankName: acc.details.account.product || 'Banco',
+        balance: parseFloat(acc.balances[0]?.balanceAmount?.amount || '0'),
+        currency: acc.balances[0]?.balanceAmount?.currency || 'EUR',
+        lastSync: 'Ahora',
+        accountNumber: acc.details.account.iban || 'ES** **** ****',
+        status: 'active'
+      }));
+
+      setAccounts(prev => [...prev, ...newAccounts]);
+
+      // 2. Get transactions for the first account (as an example)
+      if (newAccounts.length > 0) {
+        const txRes = await fetch(`/api/banks/transactions/${newAccounts[0].id}`);
+        const txData = await txRes.json();
+        
+        if (txData.transactions?.booked) {
+          const newTransactions: BankTransaction[] = txData.transactions.booked.map((t: any) => ({
+            id: t.transactionId || Math.random().toString(36).substring(7),
+            accountId: newAccounts[0].id,
+            date: t.bookingDate,
+            description: t.remittanceInformationUnstructured || t.creditorName || 'Transacción',
+            amount: parseFloat(t.transactionAmount.amount),
+            category: '',
+            isCategorized: false
+          }));
+          setTransactions(prev => [...newTransactions, ...prev]);
+        }
+      }
+
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (error) {
+      console.error('Error handling bank callback:', error);
+      setAuthError('Error al conectar con el banco. Por favor, inténtalo de nuevo.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConnectBank = async (institutionId: string) => {
+    try {
+      const response = await fetch('/api/banks/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          institutionId, 
+          redirectUrl: window.location.origin + '/?ref=' // GoCardless will append the requisition ID
+        }),
+      });
+      
+      const data = await response.json();
+      if (data.link) {
+        window.location.href = data.link;
+      } else {
+        throw new Error('No se recibió el enlace de conexión');
+      }
+    } catch (error) {
+      console.error('Error connecting bank:', error);
+      setAuthError('Error al iniciar la conexión con el banco.');
+    }
   };
 
   const handleSyncAccount = (accountId: string) => {
@@ -292,8 +393,16 @@ export default function App() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard': return <Dashboard invoices={invoices} setInvoices={setInvoices} expenses={expenses} />;
-      case 'invoices': return <Invoicing invoices={invoices} setInvoices={setInvoices} />;
+      case 'dashboard': return (
+        <Dashboard 
+          invoices={invoices} 
+          setInvoices={setInvoices} 
+          expenses={expenses} 
+          notifications={notifications}
+          setNotifications={setNotifications}
+        />
+      );
+      case 'invoices': return <Invoicing invoices={invoices} setInvoices={setInvoices} setIsAssistantOpen={setIsAssistantOpen} />;
       case 'expenses': return <Expenses expenses={expenses} setExpenses={setExpenses} />;
       case 'banking': return (
         <Banking 
@@ -320,7 +429,15 @@ export default function App() {
           </p>
         </div>
       );
-      default: return <Dashboard invoices={invoices} setInvoices={setInvoices} expenses={expenses} />;
+      default: return (
+        <Dashboard 
+          invoices={invoices} 
+          setInvoices={setInvoices} 
+          expenses={expenses} 
+          notifications={notifications}
+          setNotifications={setNotifications}
+        />
+      );
     }
   };
 
@@ -341,7 +458,14 @@ export default function App() {
         {showOnboarding && <Onboarding onComplete={handleOnboardingComplete} />}
       </AnimatePresence>
 
-      <Layout activeTab={activeTab} setActiveTab={setActiveTab} user={user} onLogin={handleLogin}>
+      <Layout 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        user={user} 
+        onLogin={handleLogin}
+        notifications={notifications}
+        setNotifications={setNotifications}
+      >
         {authError && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
@@ -365,7 +489,7 @@ export default function App() {
         </motion.div>
       </Layout>
 
-      <Copilot />
+      <VirtualAssistant isOpen={isAssistantOpen} setIsOpen={setIsAssistantOpen} />
     </>
   );
 }

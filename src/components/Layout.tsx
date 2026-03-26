@@ -1,8 +1,9 @@
 import React from 'react';
-import { LayoutDashboard, Receipt, FileText, PieChart, Bell, User, LogOut, Menu, X, ShoppingBag, Calendar, Sparkles, Landmark, Database, CloudOff } from 'lucide-react';
+import { LayoutDashboard, Receipt, FileText, PieChart, Bell, User, LogOut, Menu, X, ShoppingBag, Calendar, Sparkles, Landmark, Database, CloudOff, Info, AlertTriangle, CheckCircle2, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { AppNotification } from '../types';
 
 interface SidebarProps {
   activeTab: string;
@@ -15,10 +16,27 @@ interface LayoutProps {
   setActiveTab: (tab: string) => void;
   user?: any;
   onLogin?: () => void;
+  notifications: AppNotification[];
+  setNotifications: React.Dispatch<React.SetStateAction<AppNotification[]>>;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, user, onLogin }) => {
+export const Layout: React.FC<LayoutProps> = ({ 
+  children, 
+  activeTab, 
+  setActiveTab, 
+  user, 
+  onLogin,
+  notifications,
+  setNotifications
+}) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+  };
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -130,10 +148,103 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                 <span className="text-[10px] font-bold uppercase tracking-wider hidden lg:inline">Local Mode</span>
               </div>
             )}
-            <button className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
-              <Bell size={20} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                className={cn(
+                  "relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors",
+                  isNotificationsOpen && "bg-slate-100 text-brand-primary"
+                )}
+              >
+                <Bell size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {isNotificationsOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setIsNotificationsOpen(false)} 
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden"
+                    >
+                      <div className="p-4 border-b border-slate-50 flex items-center justify-between">
+                        <h3 className="font-bold text-slate-900">Notificaciones</h3>
+                        <button 
+                          onClick={markAllAsRead}
+                          className="text-xs text-brand-primary hover:underline font-medium"
+                        >
+                          Marcar todo como leído
+                        </button>
+                      </div>
+                      <div className="max-h-[400px] overflow-y-auto">
+                        {notifications.length > 0 ? (
+                          notifications.map((notif) => (
+                            <button
+                              key={notif.id}
+                              onClick={() => {
+                                if (notif.link) setActiveTab(notif.link);
+                                setIsNotificationsOpen(false);
+                                setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
+                              }}
+                              className={cn(
+                                "w-full p-4 text-left hover:bg-slate-50 transition-colors flex gap-3 border-b border-slate-50 last:border-0",
+                                !notif.isRead && "bg-blue-50/30"
+                              )}
+                            >
+                              <div className={cn(
+                                "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                                notif.type === 'tax' ? "bg-amber-100 text-amber-600" :
+                                notif.type === 'payment' ? "bg-rose-100 text-rose-600" :
+                                "bg-blue-100 text-blue-600"
+                              )}>
+                                {notif.type === 'tax' ? <AlertTriangle size={18} /> :
+                                 notif.type === 'payment' ? <CheckCircle2 size={18} /> :
+                                 <Info size={18} />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-0.5">
+                                  <p className={cn("text-sm font-bold truncate", !notif.isRead ? "text-slate-900" : "text-slate-600")}>
+                                    {notif.title}
+                                  </p>
+                                  <span className="text-[10px] text-slate-400">{notif.date}</span>
+                                </div>
+                                <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                                  {notif.description}
+                                </p>
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="p-8 text-center">
+                            <Bell size={32} className="mx-auto text-slate-200 mb-2" />
+                            <p className="text-sm text-slate-400">No tienes notificaciones</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-3 bg-slate-50 text-center">
+                        <button 
+                          onClick={() => {
+                            setActiveTab('calendar');
+                            setIsNotificationsOpen(false);
+                          }}
+                          className="text-xs text-slate-500 hover:text-brand-primary font-medium flex items-center justify-center gap-1 mx-auto"
+                        >
+                          Ver calendario fiscal <ChevronRight size={12} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
             <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
             <button 
               onClick={() => setActiveTab('profile')}

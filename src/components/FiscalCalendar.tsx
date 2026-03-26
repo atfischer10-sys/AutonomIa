@@ -185,7 +185,7 @@ export const FiscalCalendar: React.FC = () => {
 
           <div className="bg-brand-primary p-8 rounded-3xl text-white relative overflow-hidden">
             <Sparkles className="absolute top-4 right-4 text-white/20" size={48} />
-            <h4 className="text-lg font-bold mb-2">Copiloto IA dice:</h4>
+            <h4 className="text-lg font-bold mb-2">Asistente Virtual dice:</h4>
             <p className="text-sm text-blue-100 leading-relaxed">
               {currentMonthEvents.length > 0 
                 ? `"Recuerda que este mes tienes ${currentMonthEvents.length} plazos importantes. He preparado los borradores necesarios para que no te preocupes por nada."`

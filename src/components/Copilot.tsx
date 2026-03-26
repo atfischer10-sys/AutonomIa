@@ -8,14 +8,18 @@ import { cn } from '../lib/utils';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-export const Copilot: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
+interface VirtualAssistantProps {
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
+}
+
+export const VirtualAssistant: React.FC<VirtualAssistantProps> = ({ isOpen, setIsOpen }) => {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       role: 'assistant',
-      content: '¡Hola! Soy tu Copiloto Fiscal. He detectado que tienes 3 gastos sin categorizar de esta semana. También puedes conectar tu banco para automatizar todo. ¿Qué prefieres hacer?',
+      content: '¡Hola! Soy tu Asistente Virtual Fiscal impulsado por Gemini. He detectado que tienes 3 gastos sin categorizar de esta semana. También puedes conectar tu banco para automatizar todo. ¿Qué prefieres hacer?',
       timestamp: new Date(),
       actions: [
         { id: 'a1', label: 'Categorizar gastos', type: 'categorize_expense' },
@@ -52,11 +56,12 @@ export const Copilot: React.FC = () => {
     try {
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: [
-          { role: 'user', parts: [{ text: input }] }
-        ],
+        contents: messages.map(msg => ({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.content }]
+        })).concat([{ role: 'user', parts: [{ text: input }] }]),
         config: {
-          systemInstruction: `Eres AutonomIA, un copiloto fiscal experto para autónomos en España en el año 2026. 
+          systemInstruction: `Eres AutonomIA, un asistente virtual fiscal experto para autónomos en España en el año 2026. 
           Tu tono es profesional, cercano y proactivo. 
           Ayudas con IVA, IRPF, facturación electrónica (Ley Crea y Crece), Veri*factu y conciliación bancaria.
           Si el usuario pide algo relacionado con facturas, bancos o impuestos, ofrece acciones concretas.
@@ -74,6 +79,12 @@ export const Copilot: React.FC = () => {
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Error calling Gemini:', error);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: 'Hubo un error al conectar con Gemini. Por favor, inténtalo de nuevo.',
+        timestamp: new Date(),
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -96,7 +107,7 @@ export const Copilot: React.FC = () => {
                   <Sparkles size={20} className="text-brand-accent" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">AutonomIA Copilot</h3>
+                  <h3 className="font-semibold">AutonomIA Asistente Virtual</h3>
                   <p className="text-xs text-blue-100">Tu piloto automático fiscal</p>
                 </div>
               </div>
@@ -196,7 +207,7 @@ export const Copilot: React.FC = () => {
         className="bg-brand-primary text-white p-4 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all flex items-center gap-2 group"
       >
         <Sparkles size={24} className={cn("group-hover:rotate-12 transition-transform", isOpen && "rotate-180")} />
-        {!isOpen && <span className="font-semibold pr-2">Copilot</span>}
+        {!isOpen && <span className="font-semibold pr-2">Asistente Virtual</span>}
       </button>
     </div>
   );

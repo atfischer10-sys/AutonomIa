@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Landmark, Plus, RefreshCw, ArrowUpRight, ArrowDownLeft, Search, Filter, Sparkles, Shield, ExternalLink, CheckCircle2, AlertCircle, Loader2, Trash2 } from 'lucide-react';
+import { Landmark, Plus, RefreshCw, ArrowUpRight, ArrowDownLeft, Search, Filter, Sparkles, Shield, ExternalLink, CheckCircle2, AlertCircle, Loader2, Trash2, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { BankAccount, BankTransaction } from '../types';
@@ -7,7 +7,7 @@ import { BankAccount, BankTransaction } from '../types';
 interface BankingProps {
   accounts: BankAccount[];
   transactions: BankTransaction[];
-  onConnectBank: () => void;
+  onConnectBank: (institutionId: string) => void;
   onSync: (accountId: string) => void;
   onCategorize: (transactionId: string) => void;
   onDeleteAccount: (accountId: string) => void;
@@ -23,6 +23,29 @@ export const Banking: React.FC<BankingProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [institutions, setInstitutions] = useState<any[]>([]);
+  const [isLoadingBanks, setIsLoadingBanks] = useState(false);
+
+  const fetchBanks = async () => {
+    setIsLoadingBanks(true);
+    try {
+      const res = await fetch('/api/banks/institutions?country=ES');
+      const data = await res.json();
+      setInstitutions(data);
+    } catch (error) {
+      console.error('Error fetching banks:', error);
+    } finally {
+      setIsLoadingBanks(false);
+    }
+  };
+
+  const handleOpenBankModal = () => {
+    setShowBankModal(true);
+    if (institutions.length === 0) {
+      fetchBanks();
+    }
+  };
 
   const handleSyncAll = async () => {
     setIsSyncingAll(true);
@@ -34,6 +57,65 @@ export const Banking: React.FC<BankingProps> = ({
 
   return (
     <div className="space-y-8">
+      {/* Bank Selection Modal */}
+      <AnimatePresence>
+        {showBankModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-slate-900">Selecciona tu banco</h2>
+                <button onClick={() => setShowBankModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                  <X size={20} className="text-slate-400" />
+                </button>
+              </div>
+              
+              <div className="p-4 overflow-y-auto">
+                {isLoadingBanks ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <Loader2 className="animate-spin text-brand-primary" size={32} />
+                    <p className="text-sm text-slate-500">Cargando bancos disponibles...</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2">
+                    {institutions.map((bank) => (
+                      <button
+                        key={bank.id}
+                        onClick={() => onConnectBank(bank.id)}
+                        className="flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 text-left group"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+                          {bank.logo ? (
+                            <img src={bank.logo} alt={bank.name} className="w-full h-full object-contain" />
+                          ) : (
+                            <Landmark size={20} className="text-slate-400" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-bold text-slate-900 group-hover:text-brand-primary transition-colors">{bank.name}</p>
+                          <p className="text-xs text-slate-500 uppercase tracking-wider">{bank.bic || 'PSD2 API'}</p>
+                        </div>
+                        <ArrowUpRight size={18} className="text-slate-300 group-hover:text-brand-primary transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              <div className="p-6 bg-slate-50 border-t border-slate-100">
+                <p className="text-[10px] text-slate-400 text-center uppercase tracking-widest font-bold">
+                  Conexión segura certificada por GoCardless & PSD2
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -53,7 +135,7 @@ export const Banking: React.FC<BankingProps> = ({
             Sincronizar todo
           </button>
           <button 
-            onClick={onConnectBank}
+            onClick={handleOpenBankModal}
             className="bg-brand-primary text-white px-6 py-2.5 rounded-xl font-semibold shadow-lg shadow-brand-primary/20 hover:scale-105 transition-all flex items-center gap-2"
           >
             <Plus size={18} />
@@ -119,7 +201,7 @@ export const Banking: React.FC<BankingProps> = ({
         
         {accounts.length === 0 && (
           <button 
-            onClick={onConnectBank}
+            onClick={handleOpenBankModal}
             className="border-2 border-dashed border-slate-200 rounded-3xl p-8 flex flex-col items-center justify-center gap-4 hover:border-brand-primary/30 hover:bg-brand-primary/5 transition-all group"
           >
             <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-brand-primary/10 group-hover:text-brand-primary transition-all">

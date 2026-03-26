@@ -77,3 +77,14 @@ export interface Action {
   type: 'create_invoice' | 'categorize_expense' | 'prepare_tax' | 'apply_deduction' | 'connect_bank';
   payload?: any;
 }
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  type: 'tax' | 'payment' | 'system' | 'alert';
+  isRead: boolean;
+  priority: 'low' | 'medium' | 'high';
+  link?: string;
+}
